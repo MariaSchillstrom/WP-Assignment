@@ -1,0 +1,43 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Resources:
+  EFSFileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      Encrypted: true
+      PerformanceMode: generalPurpose
+      ThroughputMode: elastic
+      FileSystemTags:
+        - Key: Name
+          Value: WPEFS
+      # Valfritt:
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_30_DAYS
+        - TransitionToArchive: AFTER_90_DAYS
+      BackupPolicy:
+        Status: ENABLED
+
+  EFSMountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SubnetId: subnet-09d87b7e1eda77420
+      SecurityGroups: [ sg-0b0ddcce79e70d2a7 ]
+
+  EFSMountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SubnetId: subnet-0ac8592636998d30c
+      SecurityGroups: [ sg-0b0ddcce79e70d2a7 ]
+
+  EFSMountTargetC:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref EFSFileSystem
+      SubnetId: subnet-04d9a77bb77b5b320
+      SecurityGroups: [ sg-0b0ddcce79e70d2a7 ]
+
+Outputs:
+  EfsId:
+    Value: !Ref EFSFileSystem
+    Description: "EFS FileSystem ID"
