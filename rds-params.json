@@ -1,0 +1,9 @@
+[
+  {"ParameterKey":"VpcSecurityGroupIds","ParameterValue":"sg-072c202d2c475594e"},
+  {"ParameterKey":"SubnetIds","ParameterValue":"subnet-09d87b7e1eda77420,subnet-0ac8592636998d30c,subnet-04d9a77bb77b5b320"},
+  {"ParameterKey":"DBInstanceClass","ParameterValue":"db.t4g.micro"},
+  {"ParameterKey":"AllocatedStorage","ParameterValue":"20"},
+  {"ParameterKey":"MaxAllocatedStorage","ParameterValue":"100"},
+  {"ParameterKey":"DBName","ParameterValue":"wordpress"},
+  {"ParameterKey":"MasterUsername","ParameterValue":"admin"}
+]

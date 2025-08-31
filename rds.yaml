@@ -1,0 +1,71 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Minimal RDS MySQL + DBSubnetGroup – managed password (Secrets Manager)"
+
+Parameters:
+  VpcSecurityGroupIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Description: "RDS SG(s)"
+
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: "Minst två subnät i olika AZ"
+
+  DBInstanceClass:
+    Type: String
+    Default: "db.t4g.micro"
+
+  AllocatedStorage:
+    Type: Number
+    Default: 20
+
+  MaxAllocatedStorage:
+    Type: Number
+    Default: 100
+
+  DBName:
+    Type: String
+    Default: "wordpress"
+
+  MasterUsername:
+    Type: String
+    Default: "admin"
+
+  DBEngineVersion:
+    Type: String
+    Default: "8.0.42"
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Subnets for RDS"
+      SubnetIds: !Ref SubnetIds
+
+  MyDB:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Engine: mysql
+      EngineVersion: !Ref DBEngineVersion
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref AllocatedStorage
+      MaxAllocatedStorage: !Ref MaxAllocatedStorage
+      StorageType: gp2
+      StorageEncrypted: true
+      MultiAZ: false
+      PubliclyAccessible: true        # sätt till false när du inte behöver Workbench från Internet
+      AutoMinorVersionUpgrade: true
+      CopyTagsToSnapshot: true
+      BackupRetentionPeriod: 0
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups: !Ref VpcSecurityGroupIds
+      DBName: !Ref DBName
+      MasterUsername: !Ref MasterUsername
+      ManageMasterUserPassword: true  # alltid Secrets Manager (ingen manuell password-parameter)
+
+Outputs:
+  DBEndpointAddress:
+    Value: !GetAtt MyDB.Endpoint.Address
+  DBSecretArn:
+    Value: !GetAtt MyDB.MasterUserSecret.SecretArn
