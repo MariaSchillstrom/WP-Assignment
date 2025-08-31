@@ -4,5 +4,6 @@
   {"ParameterKey":"AlbSecurityGroupId","ParameterValue":"sg-07ff39661c9323bd7"},
   {"ParameterKey":"WebSecurityGroupId","ParameterValue":"sg-004878a488035ebdd"},
   {"ParameterKey":"KeyName","ParameterValue":"IacTest"},
-  {"ParameterKey":"InstanceType","ParameterValue":"t3.micro"}
+  {"ParameterKey":"InstanceType","ParameterValue":"t3.micro"},
+  {"ParameterKey":"EfsId","ParameterValue":"fs-0fb9aa978c2354098"}
 ]

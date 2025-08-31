@@ -70,50 +70,53 @@ Resources:
         KeyName: !Ref KeyName
         SecurityGroupIds:
           - !Ref WebSecurityGroupId
-        UserData:
-          Fn::Base64: !Sub |
-            #!/bin/bash
-            set -euxo pipefail
+       UserData:
+  Fn::Base64: !Sub |
+    #!/bin/bash
+    set -euxo pipefail
 
-            # Packages
-            dnf -y update
-            dnf -y install nginx amazon-efs-utils
+    dnf -y update
+    dnf -y install nginx amazon-efs-utils
 
-            # EFS mount
-            mkdir -p /var/www/efs
-            mount -t efs -o tls ${EfsId}:/ /var/www/efs
-            echo "${EfsId}:/ /var/www/efs efs tls,_netdev 0 0" >> /etc/fstab
+    # Mount EFS
+    mkdir -p /var/www/efs
+    mount -t efs -o tls ${EfsId}:/ /var/www/efs
+    echo "${EfsId}:/ /var/www/efs efs tls,_netdev 0 0" >> /etc/fstab
 
-            # Minimal page on EFS
-            cat >/var/www/efs/index.html <<'HTML'
-            <!doctype html>
-            <html lang="en">
-              <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <title>Welcome</title>
-                <style>
-                  body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:40px;background:#f5f7fb;color:#0f172a}
-                  .card{max-width:720px;margin:auto;background:#fff;border-radius:16px;box-shadow:0 6px 24px rgba(15,23,42,.08);padding:32px}
-                  h1{font-size:28px;margin:0 0 16px}
-                  p{margin:8px 0 0;font-size:16px;line-height:1.6;color:#334155}
-                </style>
-              </head>
-              <body>
-                <div class="card">
-                  <h1>Welcome to NGINX (EFS)</h1>
-                  <p>Served from shared storage on Amazon EFS.</p>
-                </div>
-              </body>
-            </html>
-            HTML
+    # Skapa startsida endast om den inte finns redan
+    if [ ! -f /var/www/efs/index.html ]; then
+      cat >/var/www/efs/index.html <<'HTML'
+      <!doctype html>
+      <html lang="sv">
+        <head>
+          <meta charset="utf-8">
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>Min WordPress-miljö</title>
+          <style>
+            body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:40px;background:#f5f7fb;color:#0f172a}
+            .card{max-width:720px;margin:auto;background:#fff;border-radius:16px;box-shadow:0 6px 24px rgba(15,23,42,.08);padding:32px}
+            h1{font-size:28px;margin:0 0 16px}
+            p{margin:8px 0 0;font-size:16px;line-height:1.6;color:#334155}
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>Välkommen 🎉</h1>
+            <p>Denna sida servas från delad lagring (Amazon EFS) bakom ALB + ASG.</p>
+          </div>
+        </body>
+      </html>
+      HTML
+    fi
 
-            # Point nginx to EFS content
-            rm -rf /usr/share/nginx/html
-            ln -s /var/www/efs /usr/share/nginx/html
+    # Peka Nginx mot EFS (symlink är redan din metod)
+    rm -rf /usr/share/nginx/html
+    ln -s /var/www/efs /usr/share/nginx/html
 
-            systemctl enable nginx
-            systemctl restart nginx
+    systemctl enable nginx
+    systemctl restart nginx
+
+
 
   WebServerGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
