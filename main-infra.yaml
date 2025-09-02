@@ -1,33 +1,25 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: ALB + TargetGroup + LaunchTemplate + ASG (nginx) + EFS mount
+Description: ALB + TargetGroup + LaunchTemplate + ASG (WordPress AMI, utan UserData)
 
 Parameters:
   AmiId:
     Type: String
-    Description: "AMI to use for WordPress nodes (your new golden AMI)"
-    Default: ami-03ebbd71503bf5fed   # <-- byt till ditt nya AMI-ID
-  EfsId:
-    Type: String
-    Description: "EFS FileSystem ID (ex: fs-xxxxxxxxxxx)"
+    Description: "AMI to use for WordPress nodes (your golden AMI)"
+    Default: ami-03ebbd71503bf5fed  # <-- byt vid behov
   VPC:
     Type: AWS::EC2::VPC::Id
-    Description: "VPC to use"
   Subnets:
     Type: List<AWS::EC2::Subnet::Id>
-    Description: "At least two subnets in different AZs"
   AlbSecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
-    Description: "Existing SG for ALB"
   WebSecurityGroupId:
     Type: AWS::EC2::SecurityGroup::Id
-    Description: "Existing SG for web/ASG"
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
   InstanceType:
     Type: String
     Default: t3.micro
     AllowedValues: [ t3.micro, t3.small, t3.medium ]
-  KeyName:
-    Type: AWS::EC2::KeyPair::KeyName
-  
 
 Resources:
   EC2TargetGroup:
@@ -38,11 +30,13 @@ Resources:
       Port: 80
       TargetType: instance
       HealthCheckProtocol: HTTP
-      HealthCheckPath: /wordpress/
-      HealthCheckIntervalSeconds: 30
-      HealthCheckTimeoutSeconds: 15
-      HealthyThresholdCount: 5
-      UnhealthyThresholdCount: 3
+      HealthCheckPath: /wordpress/index.php
+      Matcher:
+        HttpCode: 200-399
+      HealthCheckIntervalSeconds: 60
+      HealthCheckTimeoutSeconds: 30
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
 
   ApplicationLoadBalancer:
     Type: AWS::ElasticLoadBalancingV2::LoadBalancer
@@ -72,7 +66,7 @@ Resources:
         KeyName: !Ref KeyName
         SecurityGroupIds:
           - !Ref WebSecurityGroupId
-      
+        # Ingen UserData här – allt finns i AMI:t
 
   WebServerGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -84,11 +78,10 @@ Resources:
       MinSize: "3"
       DesiredCapacity: "3"
       MaxSize: "3"
-      TargetGroupARNs: [ !Ref EC2TargetGroup ]
+      TargetGroupARNs:
+        - !Ref EC2TargetGroup
       HealthCheckType: ELB
       HealthCheckGracePeriod: 180
-      
-
       Tags:
         - Key: Name
           Value: wp-web-node
@@ -96,5 +89,5 @@ Resources:
 
 Outputs:
   AlbDNS:
-    Description: "ALB DNS name"
     Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Description: "ALB DNS name"
