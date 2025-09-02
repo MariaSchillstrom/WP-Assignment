@@ -6,4 +6,5 @@
   {"ParameterKey":"KeyName","ParameterValue":"IacTest"},
   {"ParameterKey":"InstanceType","ParameterValue":"t3.micro"},
   {"ParameterKey":"EfsId","ParameterValue":"fs-0fb9aa978c2354098"}
+
 ]
