@@ -1,43 +1,89 @@
 AWSTemplateFormatVersion: "2010-09-09"
+Description: ALB + TG + LT + ASG (endast Nginx + healthcheck)
+
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  AlbSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  WebSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small, t3.medium]
+  LatestAmiId:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+
 Resources:
-  EFSFileSystem:
-    Type: AWS::EFS::FileSystem
+  EC2TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      Encrypted: true
-      PerformanceMode: generalPurpose
-      ThroughputMode: elastic
-      FileSystemTags:
-        - Key: Name
-          Value: WPEFS
-      # Valfritt:
-      LifecyclePolicies:
-        - TransitionToIA: AFTER_30_DAYS
-        - TransitionToArchive: AFTER_90_DAYS
-      BackupPolicy:
-        Status: ENABLED
+      VpcId: !Ref VPC
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /healthz.html
+      Matcher: { HttpCode: "200-399" }
 
-  EFSMountTargetA:
-    Type: AWS::EFS::MountTarget
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
     Properties:
-      FileSystemId: !Ref EFSFileSystem
-      SubnetId: subnet-09d87b7e1eda77420
-      SecurityGroups: [ sg-0b0ddcce79e70d2a7 ]
+      Scheme: internet-facing
+      Type: application
+      Subnets: !Ref Subnets
+      SecurityGroups: [ !Ref AlbSecurityGroupId ]
 
-  EFSMountTargetB:
-    Type: AWS::EFS::MountTarget
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
-      FileSystemId: !Ref EFSFileSystem
-      SubnetId: subnet-0ac8592636998d30c
-      SecurityGroups: [ sg-0b0ddcce79e70d2a7 ]
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref EC2TargetGroup
 
-  EFSMountTargetC:
-    Type: AWS::EFS::MountTarget
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
     Properties:
-      FileSystemId: !Ref EFSFileSystem
-      SubnetId: subnet-04d9a77bb77b5b320
-      SecurityGroups: [ sg-0b0ddcce79e70d2a7 ]
+      LaunchTemplateName: !Sub ${AWS::StackName}-lt
+      LaunchTemplateData:
+        ImageId: !Ref LatestAmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref WebSecurityGroupId
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euxo pipefail
+            dnf -y install nginx
+            mkdir -p /usr/share/nginx/html
+            echo "ok" > /usr/share/nginx/html/healthz.html
+            systemctl enable --now nginx
+
+  WebServerGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: !Ref Subnets
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: "3"
+      DesiredCapacity: "3"
+      MaxSize: "3"
+      TargetGroupARNs: [ !Ref EC2TargetGroup ]
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 60
 
 Outputs:
-  EfsId:
-    Value: !Ref EFSFileSystem
-    Description: "EFS FileSystem ID"
+  AlbDNS:
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Description: ALB DNS
