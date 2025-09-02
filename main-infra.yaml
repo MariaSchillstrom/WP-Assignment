@@ -2,6 +2,10 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: ALB + TargetGroup + LaunchTemplate + ASG (nginx) + EFS mount
 
 Parameters:
+  AmiId:
+    Type: String
+    Description: "AMI to use for WordPress nodes (your new golden AMI)"
+    Default: ami-03ebbd71503bf5fed   # <-- byt till ditt nya AMI-ID
   EfsId:
     Type: String
     Description: "EFS FileSystem ID (ex: fs-xxxxxxxxxxx)"
@@ -23,9 +27,7 @@ Parameters:
     AllowedValues: [ t3.micro, t3.small, t3.medium ]
   KeyName:
     Type: AWS::EC2::KeyPair::KeyName
-  LatestAmiId:
-    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
-    Default: "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+  
 
 Resources:
   EC2TargetGroup:
@@ -36,7 +38,7 @@ Resources:
       Port: 80
       TargetType: instance
       HealthCheckProtocol: HTTP
-      HealthCheckPath: /
+      HealthCheckPath: /wordpress/
       HealthCheckIntervalSeconds: 30
       HealthCheckTimeoutSeconds: 15
       HealthyThresholdCount: 5
@@ -65,55 +67,12 @@ Resources:
     Properties:
       LaunchTemplateName: !Sub ${AWS::StackName}-lt
       LaunchTemplateData:
-        ImageId: !Ref LatestAmiId
+        ImageId: !Ref AmiId
         InstanceType: !Ref InstanceType
         KeyName: !Ref KeyName
         SecurityGroupIds:
           - !Ref WebSecurityGroupId
-        UserData:
-          Fn::Base64: !Sub |
-            #!/bin/bash
-            set -euxo pipefail
-
-            # Packages
-            dnf -y update
-            dnf -y install nginx amazon-efs-utils
-
-            # EFS mount
-            mkdir -p /var/www/efs
-            mount -t efs -o tls ${EfsId}:/ /var/www/efs
-            echo "${EfsId}:/ /var/www/efs efs tls,_netdev 0 0" >> /etc/fstab
-
-            # Minimal page on EFS
-            cat >/var/www/efs/index.html <<'HTML'
-            <!doctype html>
-            <html lang="en">
-              <head>
-                <meta charset="utf-8">
-                <meta name="viewport" content="width=device-width, initial-scale=1">
-                <title>Welcome</title>
-                <style>
-                  body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:40px;background:#f5f7fb;color:#0f172a}
-                  .card{max-width:720px;margin:auto;background:#fff;border-radius:16px;box-shadow:0 6px 24px rgba(15,23,42,.08);padding:32px}
-                  h1{font-size:28px;margin:0 0 16px}
-                  p{margin:8px 0 0;font-size:16px;line-height:1.6;color:#334155}
-                </style>
-              </head>
-              <body>
-                <div class="card">
-                  <h1>Welcome to NGINX (EFS)</h1>
-                  <p>Served from shared storage on Amazon EFS.</p>
-                </div>
-              </body>
-            </html>
-            HTML
-
-            # Point nginx to EFS content
-            rm -rf /usr/share/nginx/html
-            ln -s /var/www/efs /usr/share/nginx/html
-
-            systemctl enable nginx
-            systemctl restart nginx
+      
 
   WebServerGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
@@ -128,6 +87,8 @@ Resources:
       TargetGroupARNs: [ !Ref EC2TargetGroup ]
       HealthCheckType: ELB
       HealthCheckGracePeriod: 180
+      
+
       Tags:
         - Key: Name
           Value: wp-web-node
