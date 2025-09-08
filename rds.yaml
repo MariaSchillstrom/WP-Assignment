@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: "Minimal RDS MySQL + DBSubnetGroup – managed password (Secrets Manager)"
+
 
 Parameters:
   VpcSecurityGroupIds:
@@ -54,7 +54,7 @@ Resources:
       StorageType: gp2
       StorageEncrypted: true
       MultiAZ: false
-      PubliclyAccessible: true        # sätt till false när du inte behöver Workbench från Internet
+      PubliclyAccessible: true       
       AutoMinorVersionUpgrade: true
       CopyTagsToSnapshot: true
       BackupRetentionPeriod: 0

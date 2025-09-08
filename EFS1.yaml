@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: ALB + TG + LT + ASG (endast Nginx + healthcheck)
+
 
 Parameters:
   VPC:

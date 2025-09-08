@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: Security Groups for ALB, ASG (web), EFS, and RDS
+
 
 Parameters:
   VpcId:

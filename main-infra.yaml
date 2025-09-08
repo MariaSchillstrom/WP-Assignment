@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: "2010-09-09"
-Description: ALB + TargetGroup + LaunchTemplate + ASG (WordPress AMI, utan UserData)
+
 
 Parameters:
   AmiId:
