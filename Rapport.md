@@ -121,7 +121,7 @@ Ej med här: HTTPS/ACM, WAF, CloudFront, Secrets Manager, avancerad logging/moni
 **Motivering:** Ej behandlat i kursmomentet, ej nödvändigt för uppgiftens kriterier G/VG; arkitekturen stödjer att lägga till detta senare.  
 
 <div class="page"/>
-v>
+
 
 <div class="page"/>
 
@@ -308,6 +308,8 @@ Resources:
 
 ```
 
+<div style="page-break-before: always;"></div>
+
 
 ## 5. Provisionering & konfiguration (steg-för-steg)
 
@@ -463,6 +465,7 @@ aws cloudformation create-stack \
 
 ---
 
+<div class="page"/>
 
 ### 5.4 Bygg WordPress-grund på fristående EC2 → skapa AMI för ASG
 
