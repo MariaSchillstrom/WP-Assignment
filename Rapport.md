@@ -1376,7 +1376,7 @@ Outputs:
   DBSecretArn:
     Value: !GetAtt MyDB.MasterUserSecret.SecretArn
 ```
-
+<div class="page"/>
 
 ## 13. Skapa CloudFormation via Iac generator (Exempel RDS)
 
@@ -1384,66 +1384,58 @@ Outputs:
 
 ### Steg-för-steg (Bild 1–7)
 
-- Välj **Standard create**
-- Välj databas-motor: **MySQL**
-- Under **Templates**, välj **Free tier**
-- Under **Availability & durability**, välj **Single-AZ**
-- Ange ett **lösenord** under *Set password*
+- Välj **Standard create**  
+- Välj databas-motor: **MySQL**  
+- Under **Templates**, välj **Free tier**  
+- Under **Availability & durability**, välj **Single-AZ**  
+- Ange ett **lösenord** under *Set password*  
 - Scrolla ner till **Connectivity**  
   - Välj **Public access = Yes**  
   - Välj en **Security Group** som du redan skapat  
-    *(OBS: Security Group måste tillåta inbound på port `3306`)*
+    *(OBS: Security Group måste tillåta inbound på port `3306`)*  
 - Gå till **Additional configuration**  
   - **Initial database name** → detta är **schemat**, inte instansen  
   - Döp databasen till något valfritt  
-  - Klicka bort rutan *Enable automated backups*
-- Klicka på **Create**
+  - Klicka bort rutan *Enable automated backups*  
+- Klicka på **Create**  
 
-![1](1.png)
+![RDS steg 1](Images/1.png)  
+![RDS steg 2](Images/2.png)  
+![RDS steg 3](Images/3.png)  
+![RDS steg 4](Images/4.png)  
+![RDS steg 5](Images/5.png)  
+![RDS steg 6](Images/6.png)  
+![RDS steg 7](Images/7.png)  
 
-![1](2.png)
-
-![1](3.png)
-
-![1](4.png)
-
-![1](5.png)
-
-![1](6.png)
-
-![1](7.png)
+<div class="page"/>
 
 ### Skapa en CloudFormation via Iac generator 
 
-- Sök upp Iac Generator 
+**Steg 8 – Sök upp Iac Generator**  
+![IaC steg 8](Images/8.png)  
 
-![1](8.png)
+**Steg 9 – Scan specific resources**  
+![IaC steg 9](Images/9.png)  
 
--Scan specific resources 
+**Steg 10 – Skriv RDS i sökfältet och bocka i enligt bild**  
+![IaC steg 10](Images/10.png)  
 
-![1](9.png)
+**Steg 11 – Välj *Start from new template* och döp templaten**  
+![IaC steg 11](Images/11.png)  
 
-- Skriv RDS i sökfältet och bocka i enligt bild
+**Steg 12 – Lägg till de resources du valde**  
+![IaC steg 12](Images/12.png)  
 
-![1](10.png)
+**Steg 13 – Review och spara**  
+![IaC steg 13](Images/13.png)  
 
-- Välj start from new template/ Döp templaten 
+<div class="page"/>
 
-![1](11.png)
-
-Lägg till de resources du valde 
-
-![1](12.png)
-
-Rewiev och spara 
-
-![1](13.png)
-
-- Templaten är klar, icke paramatiserad. Den paramatiserade ligger under punkt 12.
--  Tips är att ta hjälp av LLM tills det sitter hur strukturen ska vara. 
-
-![1](14.png)
-
+**Steg 14 – Färdig template**  
+Templaten är klar, icke paramatiserad.  
+Den paramatiserade ligger under punkt 12.  
+Tips: Ta hjälp av LLM tills det sitter hur strukturen ska vara.  
+![IaC steg 14](Images/14.png)
 
 
 
