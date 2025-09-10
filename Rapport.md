@@ -1,4 +1,64 @@
+# WordPress AWS Infrastructure Assignment  
 
+### Maria Schillström  
+### Kurs: Skalbara molnapplikationer  
+### Datum: 2025-09-10  
+
+<div class="page"/>
+
+
+
+
+- [WordPress AWS Infrastructure Assignment](#wordpress-aws-infrastructure-assignment)
+    - [Maria Schillström](#maria-schillström)
+    - [Kurs: Skalbara molnapplikationer](#kurs-skalbara-molnapplikationer)
+    - [Datum: 2025-09-10](#datum-2025-09-10)
+  - [1. Sammanfattning (Executive summary)](#1-sammanfattning-executive-summary)
+  - [2. Arkitektur \& design](#2-arkitektur--design)
+    - [2.1 Översikt](#21-översikt)
+    - [2.2 Persistens \& stateless princip](#22-persistens--stateless-princip)
+    - [2.3 Skalbarhet \& tillgänglighet](#23-skalbarhet--tillgänglighet)
+    - [2.4 Säkerhet](#24-säkerhet)
+    - [2.5 Avgränsningar](#25-avgränsningar)
+  - [3. Utnyttjade molntjänster](#3-utnyttjade-molntjänster)
+    - [Hur resurserna skapades](#hur-resurserna-skapades)
+  - [4. Verktyg \& arbetssätt](#4-verktyg--arbetssätt)
+  - [5. Provisionering \& konfiguration (steg-för-steg)](#5-provisionering--konfiguration-steg-för-steg)
+    - [5.1 Förutsättningar](#51-förutsättningar)
+    - [5.2 SG-kopplingar](#52-sg-kopplingar)
+    - [5.3 CloudFormation-stack för ALB/TG/LT/ASG](#53-cloudformation-stack-för-albtgltasg)
+    - [5.4 Bygg WordPress-grund på fristående EC2 → skapa AMI för ASG](#54-bygg-wordpress-grund-på-fristående-ec2--skapa-ami-för-asg)
+      - [Förutsättningar](#förutsättningar)
+      - [5.4.1 Starta EC2 + Security Groups](#541-starta-ec2--security-groups)
+      - [5.4.2 Installera paket](#542-installera-paket)
+      - [5.4.3 Starta tjänster](#543-starta-tjänster)
+      - [5.4.5 Koppla Apache → PHP-FPM](#545-koppla-apache--php-fpm)
+      - [5.4.6 Lägg in WordPress](#546-lägg-in-wordpress)
+      - [5.4.7 Koppla mot RDS (wp-config.php)](#547-koppla-mot-rds-wp-configphp)
+      - [5.4.8 Tillåt DB-trafik (SELinux)](#548-tillåt-db-trafik-selinux)
+      - [5.4.9 Verifiera \& slutför WP-installationen](#549-verifiera--slutför-wp-installationen)
+    - [5.5 Skapa AMI och rulla ut via ASG](#55-skapa-ami-och-rulla-ut-via-asg)
+      - [5.5.1 Skapa AMI från din fungerande EC2](#551-skapa-ami-från-din-fungerande-ec2)
+      - [5.5.2 Skapa ny Launch Template-version](#552-skapa-ny-launch-template-version)
+      - [5.5.3 Peka ASG till nya LT-versionen + Instance Refresh](#553-peka-asg-till-nya-lt-versionen--instance-refresh)
+      - [5.5.4 Verifiera](#554-verifiera)
+  - [6.0 RDS – databas för WordPress (MANUELLT → därefter IaC)](#60-rds--databas-för-wordpress-manuellt--därefter-iac)
+    - [6.1 Provisionering via CloudFormation](#61-provisionering-via-cloudformation)
+    - [7 Problem \& lösning – Security Groups](#7-problem--lösning--security-groups)
+    - [7.1 Verifiering](#71-verifiering)
+  - [8 EFS för media (MANUELLT → därefter IaC)](#8-efs-för-media-manuellt--därefter-iac)
+  - [9. Drift, uppdatering \& rollback](#9-drift-uppdatering--rollback)
+  - [10. Felsökning (kort)](#10-felsökning-kort)
+  - [11. Reflektion](#11-reflektion)
+    - [Om jag fick göra om](#om-jag-fick-göra-om)
+    - [Lägg till i framtiden](#lägg-till-i-framtiden)
+  - [12. Kompletta CloudFormation-skript använda](#12-kompletta-cloudformation-skript-använda)
+  - [13. Skapa CloudFormation via Iac generator (Exempel RDS)](#13-skapa-cloudformation-via-iac-generator-exempel-rds)
+    - [Skapa en RDS-databas (MySQL)](#skapa-en-rds-databas-mysql)
+    - [Steg-för-steg (Bild 1–7)](#steg-för-steg-bild-17)
+    - [Skapa en CloudFormation via Iac generator](#skapa-en-cloudformation-via-iac-generator)
+
+<div style="page-break-after: always;"></div>
 
 
 
@@ -790,7 +850,7 @@ echo "<efs-id>:/ /mnt/efs efs tls,_netdev 0 0" | sudo tee -a /etc/fstab
 
 **Notis:** *EFS sattes först upp manuellt. Därefter exporterades via IaC Generator till en CloudFormation-mall.*  
 
-**Utkast (EFS1.yaml):**
+**Utdrag (EFS1.yaml):**
 
 ```yaml
 AWSTemplateFormatVersion: "2010-09-09"
