@@ -815,34 +815,556 @@ Resources:
 
 ---
 
-## 6. Drift, uppdatering & rollback (kursnivå)
+## 6. Drift, uppdatering & rollback
 
-* **Ny version:** ändra på fristående EC2 → skapa **ny AMI** → uppdatera **AmiId** → **Instance Refresh**.
-* **Rollback:** peka tillbaka `AmiId` till föregående AMI → ny **Instance Refresh**.
+- **Ny version:**  
+  Ändra på fristående EC2 → skapa **ny AMI** → uppdatera **AmiId** → kör **Instance Refresh**.
+- **Rollback:**  
+  Peka tillbaka `AmiId` till föregående AMI → kör en ny **Instance Refresh**.
 
 ---
 
 ## 7. Felsökning (kort)
 
-* **504 från ALB:** kontrollera RDS-SG (3306 från Web-SG), TG-timeout, HealthCheckPath.
-* **500 lokalt:** PHP-FPM saknas/fel socket-ägare (se 5.4).
-* **404 på `info.php`:** filen inte i `/var/www/html`.
-* **Git Bash path-conversion:** använd PowerShell eller `MSYS_NO_PATHCONV=1`.
+- **504 från ALB:** kontrollera RDS-SG (3306 från Web-SG), TG-timeout, HealthCheckPath.  
+- **500 lokalt:** PHP-FPM saknas eller fel socket-ägare (se avsnitt 5.4).  
+- **404 på `info.php`:** filen ligger inte i `/var/www/html`.  
+- **Git Bash path-conversion:** använd PowerShell eller sätt `MSYS_NO_PATHCONV=1`.  
 
 ---
 
-## 8. Reflektion & fortsatt arbete
+## 8. Reflektion
 
-* Lägg till **HTTPS/ACM**, **WAF**, autoscaling-policys, **backup/restore-rutiner** för RDS/EFS, och **CI/CD** för AMI-byggen när kursmomenten täcker detta.
+Det här var en väldigt intressant och delvis överväldigande uppgift.  
+Jag brukar inte ha problem med att lägga upp en rapport med tutorials, bilder, kod m.m., men detta var en rejäl utmaning.  
+
+På agendan hade jag även att sätta upp **monitoring** samt köra ett **stresstest**, men det hann jag dessvärre inte med.  
+
+Jag har under resans gång jämfört med hur vi gjorde i **Azure**, och jag kan se både fördelar och nackdelar med bägge. Det har även snurrat i mitt huvud om det funnits andra sätt att göra saker på än de vi använt i Azure.  
+
+Därför tog jag fram en liten lista med jämförelser mellan AWS och Azure:
 
 ---
 
-**Snabbverifiering:**
+## AWS ↔ Azure – Vanliga motsvarigheter
 
-```bash
-nc -zv <rds-endpoint> 3306
-nc -zv <efs-mount-target-ip> 2049
-```
+| **AWS** | **Azure** | **Kommentar** |
+|---------|-----------|----------------|
+| **EFS (Elastic File System)** | **Azure Files** | Delat filsystem (SMB/NFS), kan mountas på flera VM. |
+| **ASG (Auto Scaling Group)** | **VM Scale Sets (VMSS)** | Skalar upp/ner en grupp identiska VM automatiskt. |
+| **RDS (Relational Database Service)** | **Azure Database Services** (Azure SQL Database, Azure Database for MySQL/PostgreSQL) | Hanterade databaser. |
+| **S3 (Simple Storage Service)** | **Azure Blob Storage** | Objektlagring (bilder, filer, backup). |
+| **EC2 (Elastic Compute Cloud)** | **Azure Virtual Machines** | Virtuella servrar. |
+| **VPC (Virtual Private Cloud)** | **Azure Virtual Network (VNet)** | Isolerat nätverk för resurser. |
+| **ALB (Application Load Balancer)** | **Azure Application Gateway** | Layer 7 load balancing. |
+| **NLB (Network Load Balancer)** | **Azure Load Balancer** | Layer 4 load balancing. |
+
+---
+
+### Om jag fick göra om
+
+- Mer dokumentation på rätt ställen. Nu har jag spritt mig mellan PowerPoint, Word, Notion och Notepad++.  
+- Försöka fördela tiden bättre.  
+- Inte ha så mycket "men tänk om" i huvudet – utan fokusera på det som faktiskt ska göras.  
+
+---
+
+### Lägg till i framtiden
+
+- **HTTPS/ACM**  
+- **WAF**  
+- Autoscaling-policys  
+- **Backup/restore-rutiner** för RDS/EFS  
+- **CI/CD** för AMI-byggen  
+- **Monitoring**
+
+
+---
+
+## 9. Kompletta CloudFormation-skript använda. 
+
+**YAML-mall (security-groups.yaml):**
+
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC to place the security groups in
+  MyIP:
+    Type: String
+    Default: 0.0.0.0/0         # byt till din IP/CIDR för SSH i labb
+    Description: CIDR for SSH access to web nodes (use your /32 in prod)
+
+Resources:
+  # 1) ALB SG: 80 from Internet
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB ingress 80 from Internet
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  # 2) Web/ASG SG: 80 from ALB, optional SSH from MyIP
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Web nodes behind ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # HTTP only from ALB SG
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+        # (Optional) SSH from your IP for lab
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyIP
+
+  # 3) EFS SG: NFS 2049 from web nodes
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EFS NFS access from web nodes
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+
+  # 4) RDS SG: MySQL 3306 from web nodes
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS MySQL access from web nodes
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+
+Outputs:
+  AlbSecurityGroupId:
+    Value: !Ref AlbSecurityGroup
+    Description: ALB SG ID
+  WebSecurityGroupId:
+    Value: !Ref WebSecurityGroup
+    Description: Web/ASG SG ID
+  EfsSecurityGroupId:
+    Value: !Ref EfsSecurityGroup
+    Description: EFS SG ID
+  RdsSecurityGroupId:
+    Value: !Ref RdsSecurityGroup
+    Description: RDS SG ID
+
+
+
+
+
+
+**YAML-mall (main-infra yaml ):**
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+
+Parameters:
+  AmiId:
+    Type: String
+    Description: "AMI to use for WordPress nodes (your golden AMI)"
+    Default: ami-03ebbd71503bf5fed  # <-- byt vid behov
+  VPC:
+    Type: AWS::EC2::VPC::Id
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  AlbSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  WebSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [ t3.micro, t3.small, t3.medium ]
+
+Resources:
+  EC2TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VPC
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /wordpress/index.php
+      Matcher:
+        HttpCode: 200-399
+      HealthCheckIntervalSeconds: 60
+      HealthCheckTimeoutSeconds: 30
+      HealthyThresholdCount: 3
+      UnhealthyThresholdCount: 5
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Type: application
+      Subnets: !Ref Subnets
+      SecurityGroups: [ !Ref AlbSecurityGroupId ]
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref EC2TargetGroup
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${AWS::StackName}-lt
+      LaunchTemplateData:
+        ImageId: !Ref AmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref WebSecurityGroupId
+        # Ingen UserData här – allt finns i AMI:t
+
+  WebServerGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: !Ref Subnets
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: "3"
+      DesiredCapacity: "3"
+      MaxSize: "3"
+      TargetGroupARNs:
+        - !Ref EC2TargetGroup
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 180
+      Tags:
+        - Key: Name
+          Value: wp-web-node
+          PropagateAtLaunch: true
+
+Outputs:
+  AlbDNS:
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Description: "ALB DNS name"
+
+
+
+
+
+**YAML-mall (main-infra.yaml):**//bootstrap 
+
+
+LaunchTemplate:
+  Type: AWS::EC2::LaunchTemplate
+  Properties:
+    LaunchTemplateName: !Sub ${AWS::StackName}-lt
+    LaunchTemplateData:
+      ImageId: !Ref LatestAmiId
+      InstanceType: !Ref InstanceType
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+        - !Ref WebSecurityGroupId
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          set -euxo pipefail
+          dnf -y update
+          dnf -y install nginx
+          mkdir -p /usr/share/nginx/html
+          cat >/usr/share/nginx/html/index.html <<'HTML'
+          <!doctype html>
+          <html><head><meta charset="utf-8"><title>Welcome</title></head>
+          <body style="font-family:Arial,sans-serif">
+            <h1>Welcome to NGINX</h1>
+          </body></html>
+          HTML
+          systemctl enable nginx
+          systemctl restart nginx
+
+
+
+
+**YAML-mall (EFS1.yaml):**
+
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+
+Parameters:
+  VPC:
+    Type: AWS::EC2::VPC::Id
+  Subnets:
+    Type: List<AWS::EC2::Subnet::Id>
+  AlbSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  WebSecurityGroupId:
+    Type: AWS::EC2::SecurityGroup::Id
+  KeyName:
+    Type: AWS::EC2::KeyPair::KeyName
+  InstanceType:
+    Type: String
+    Default: t3.micro
+    AllowedValues: [t3.micro, t3.small, t3.medium]
+  LatestAmiId:
+    Type: "AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>"
+    Default: "/aws/service/ami-amazon-linux-latest/al2023-ami-kernel-default-x86_64"
+
+Resources:
+  EC2TargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      VpcId: !Ref VPC
+      Protocol: HTTP
+      Port: 80
+      TargetType: instance
+      HealthCheckProtocol: HTTP
+      HealthCheckPath: /healthz.html
+      Matcher: { HttpCode: "200-399" }
+
+  ApplicationLoadBalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
+      Type: application
+      Subnets: !Ref Subnets
+      SecurityGroups: [ !Ref AlbSecurityGroupId ]
+
+  ALBListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn: !Ref ApplicationLoadBalancer
+      Port: 80
+      Protocol: HTTP
+      DefaultActions:
+        - Type: forward
+          TargetGroupArn: !Ref EC2TargetGroup
+
+  LaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
+    Properties:
+      LaunchTemplateName: !Sub ${AWS::StackName}-lt
+      LaunchTemplateData:
+        ImageId: !Ref LatestAmiId
+        InstanceType: !Ref InstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds:
+          - !Ref WebSecurityGroupId
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash
+            set -euxo pipefail
+            dnf -y install nginx
+            mkdir -p /usr/share/nginx/html
+            echo "ok" > /usr/share/nginx/html/healthz.html
+            systemctl enable --now nginx
+
+  WebServerGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      VPCZoneIdentifier: !Ref Subnets
+      LaunchTemplate:
+        LaunchTemplateId: !Ref LaunchTemplate
+        Version: !GetAtt LaunchTemplate.LatestVersionNumber
+      MinSize: "3"
+      DesiredCapacity: "3"
+      MaxSize: "3"
+      TargetGroupARNs: [ !Ref EC2TargetGroup ]
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: 60
+
+Outputs:
+  AlbDNS:
+    Value: !GetAtt ApplicationLoadBalancer.DNSName
+    Description: ALB DNS
+
+
+
+
+**YAML-mall (rds.yaml):**
+
+
+AWSTemplateFormatVersion: "2010-09-09"
+
+
+Parameters:
+  VpcSecurityGroupIds:
+    Type: List<AWS::EC2::SecurityGroup::Id>
+    Description: "RDS SG(s)"
+
+  SubnetIds:
+    Type: List<AWS::EC2::Subnet::Id>
+    Description: "Minst två subnät i olika AZ"
+
+  DBInstanceClass:
+    Type: String
+    Default: "db.t4g.micro"
+
+  AllocatedStorage:
+    Type: Number
+    Default: 20
+
+  MaxAllocatedStorage:
+    Type: Number
+    Default: 100
+
+  DBName:
+    Type: String
+    Default: "wordpress"
+
+  MasterUsername:
+    Type: String
+    Default: "admin"
+
+  DBEngineVersion:
+    Type: String
+    Default: "8.0.42"
+
+Resources:
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Subnets for RDS"
+      SubnetIds: !Ref SubnetIds
+
+  MyDB:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      Engine: mysql
+      EngineVersion: !Ref DBEngineVersion
+      DBInstanceClass: !Ref DBInstanceClass
+      AllocatedStorage: !Ref AllocatedStorage
+      MaxAllocatedStorage: !Ref MaxAllocatedStorage
+      StorageType: gp2
+      StorageEncrypted: true
+      MultiAZ: false
+      PubliclyAccessible: true       
+      AutoMinorVersionUpgrade: true
+      CopyTagsToSnapshot: true
+      BackupRetentionPeriod: 0
+      DBSubnetGroupName: !Ref DBSubnetGroup
+      VPCSecurityGroups: !Ref VpcSecurityGroupIds
+      DBName: !Ref DBName
+      MasterUsername: !Ref MasterUsername
+      ManageMasterUserPassword: true  # alltid Secrets Manager (ingen manuell password-parameter)
+
+Outputs:
+  DBEndpointAddress:
+    Value: !GetAtt MyDB.Endpoint.Address
+  DBSecretArn:
+    Value: !GetAtt MyDB.MasterUserSecret.SecretArn
+
+
+
+
+
+
+
+
+
+
+
+## 10. Skapa CloudFormation via Iac generator (Exempel RDS)
+
+### Skapa en RDS-databas (MySQL)
+
+### Steg-för-steg (Bild 1–7)
+
+- Välj **Standard create**
+- Välj databas-motor: **MySQL**
+- Under **Templates**, välj **Free tier**
+- Under **Availability & durability**, välj **Single-AZ**
+- Ange ett **lösenord** under *Set password*
+- Scrolla ner till **Connectivity**  
+  - Välj **Public access = Yes**  
+  - Välj en **Security Group** som du redan skapat  
+    *(OBS: Security Group måste tillåta inbound på port `3306`)*
+- Gå till **Additional configuration**  
+  - **Initial database name** → detta är **schemat**, inte instansen  
+  - Döp databasen till något valfritt  
+  - Klicka bort rutan *Enable automated backups*
+- Klicka på **Create**
+
+
+
+
+
+![1](1.png)
+
+![1](2.png)
+
+![1](3.png)
+
+![1](4.png)
+
+![1](5.png)
+
+![1](6.png)
+
+![1](7.png)
+
+### Skapa en CloudFormation via Iac generator 
+
+- Sök upp Iac Generator 
+
+![1](8.png)
+
+
+-Scan specific resources 
+
+
+![1](9.png)
+
+
+- Skriv RDS i sökfältet och bocka i enligt bild
+
+![1](10.png)
+
+
+- Välj start from new template/ Döp templaten 
+
+![1](11.png)
+
+
+Lägg till de resources du valde 
+
+
+![1](12.png)
+
+
+Rewiev och spara 
+
+![1](13.png)
+
+
+- Templaten är klar, icke paramatiserad. Tips är att ta hjälp av LLM tills det sitter hur strukturen ska vara. 
+
+![1](14.png)
+
+
+
 
 
 
