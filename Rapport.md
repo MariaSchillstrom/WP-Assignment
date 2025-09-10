@@ -10,7 +10,7 @@ Lösningen bygger på flera AWS-tjänster : EC2, RDS, Application Load Balancer,
 
 ## 2. Arkitektur & design
 
-![Arkitekturdiagram](Images/Arkitektur.png)
+![Arkitektur](Images/Arkitektur.png)
 
 ### 2.1 Översikt
 
