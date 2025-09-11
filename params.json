@@ -1,0 +1,10 @@
+[
+  {"ParameterKey":"VPC","ParameterValue":"vpc-0b329e02d752f8ce3"},
+  {"ParameterKey":"Subnets","ParameterValue":"subnet-09d87b7e1eda77420,subnet-0ac8592636998d30c,subnet-04d9a77bb77b5b320"},
+  {"ParameterKey":"AlbSecurityGroupId","ParameterValue":"sg-07ff39661c9323bd7"},
+  {"ParameterKey":"WebSecurityGroupId","ParameterValue":"sg-004878a488035ebdd"},
+  {"ParameterKey":"KeyName","ParameterValue":"IacTest"},
+  {"ParameterKey":"InstanceType","ParameterValue":"t3.micro"},
+  {"ParameterKey":"EfsId","ParameterValue":"fs-0fb9aa978c2354098"}
+
+]

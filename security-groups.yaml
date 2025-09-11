@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: "2010-09-09"
+
+
+Parameters:
+  VpcId:
+    Type: AWS::EC2::VPC::Id
+    Description: VPC to place the security groups in
+  MyIP:
+    Type: String
+    Default: 0.0.0.0/0         # byt till din IP/CIDR för SSH i labb
+    Description: CIDR for SSH access to web nodes (use your /32 in prod)
+
+Resources:
+  # 1) ALB SG: 80 from Internet
+  AlbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: ALB ingress 80 from Internet
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+
+  # 2) Web/ASG SG: 80 from ALB, optional SSH from MyIP
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Web nodes behind ALB
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        # HTTP only from ALB SG
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !Ref AlbSecurityGroup
+        # (Optional) SSH from your IP for lab
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: !Ref MyIP
+
+  # 3) EFS SG: NFS 2049 from web nodes
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: EFS NFS access from web nodes
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+
+  # 4) RDS SG: MySQL 3306 from web nodes
+  RdsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: RDS MySQL access from web nodes
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: !Ref WebSecurityGroup
+
+Outputs:
+  AlbSecurityGroupId:
+    Value: !Ref AlbSecurityGroup
+    Description: ALB SG ID
+  WebSecurityGroupId:
+    Value: !Ref WebSecurityGroup
+    Description: Web/ASG SG ID
+  EfsSecurityGroupId:
+    Value: !Ref EfsSecurityGroup
+    Description: EFS SG ID
+  RdsSecurityGroupId:
+    Value: !Ref RdsSecurityGroup
+    Description: RDS SG ID
